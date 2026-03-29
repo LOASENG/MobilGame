@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>GRAVITY SHIFT</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+–bg: #05060f;
+–primary: #00ffe7;
+–accent: #ff2d78;
+–warn: #ffb800;
+–dim: #0a0c1f;
+–grid: rgba(0,255,231,0.04);
+–glow: 0 0 20px rgba(0,255,231,0.6), 0 0 60px rgba(0,255,231,0.2);
+–glow-red: 0 0 20px rgba(255,45,120,0.7), 0 0 60px rgba(255,45,120,0.3);
+}
+
+html, body {
+width: 100%; height: 100%;
+overflow: hidden;
+background: var(–bg);
+font-family: ‘Share Tech Mono’, monospace;
+touch-action: none;
+}
+
+canvas {
+display: block;
+position: absolute;
+top: 0; left: 0;
+}
+
+#ui {
+position: absolute;
+top: 0; left: 0; right: 0; bottom: 0;
+pointer-events: none;
+display: flex;
+flex-direction: column;
+align-items: center;
+}
+
+#score-wrap {
+margin-top: 18px;
+text-align: center;
+pointer-events: none;
+}
+
+#score {
+font-family: ‘Orbitron’, monospace;
+font-size: clamp(28px, 8vw, 48px);
+font-weight: 900;
+color: var(–primary);
+text-shadow: var(–glow);
+letter-spacing: 4px;
+line-height: 1;
+transition: transform 0.08s;
+}
+
+#score.pop { transform: scale(1.3); }
+
+#best-label {
+font-size: 11px;
+color: rgba(0,255,231,0.4);
+letter-spacing: 3px;
+margin-top: 4px;
+}
+
+#best {
+font-family: ‘Orbitron’, monospace;
+font-size: 13px;
+font-weight: 700;
+color: var(–warn);
+letter-spacing: 2px;
+}
+
+/* SCREENS */
+.screen {
+position: absolute;
+inset: 0;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+background: rgba(5,6,15,0.92);
+backdrop-filter: blur(8px);
+transition: opacity 0.4s;
+pointer-events: all;
+}
+
+.screen.hidden { opacity: 0; pointer-events: none; }
+
+.logo {
+font-family: ‘Orbitron’, monospace;
+font-size: clamp(36px, 12vw, 72px);
+font-weight: 900;
+letter-spacing: 6px;
+color: var(–primary);
+text-shadow: var(–glow);
+margin-bottom: 8px;
+animation: pulse 2s ease-in-out infinite;
+}
+
+.logo span { color: var(–accent); text-shadow: var(–glow-red); }
+
+@keyframes pulse {
+0%, 100% { opacity: 1; }
+50% { opacity: 0.75; }
+}
+
+.tagline {
+font-size: clamp(11px, 3vw, 14px);
+color: rgba(0,255,231,0.5);
+letter-spacing: 4px;
+text-transform: uppercase;
+margin-bottom: 50px;
+}
+
+.tap-btn {
+font-family: ‘Orbitron’, monospace;
+font-size: clamp(14px, 4vw, 18px);
+font-weight: 700;
+letter-spacing: 4px;
+color: var(–bg);
+background: var(–primary);
+border: none;
+padding: 18px 48px;
+cursor: pointer;
+clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+box-shadow: var(–glow);
+animation: btnpulse 1.5s ease-in-out infinite;
+pointer-events: all;
+-webkit-tap-highlight-color: transparent;
+}
+
+@keyframes btnpulse {
+0%, 100% { box-shadow: var(–glow); }
+50% { box-shadow: 0 0 40px rgba(0,255,231,0.9), 0 0 100px rgba(0,255,231,0.4); }
+}
+
+.hint {
+margin-top: 24px;
+font-size: 11px;
+color: rgba(0,255,231,0.3);
+letter-spacing: 2px;
+text-align: center;
+line-height: 1.8;
+}
+
+.hint b { color: var(–primary); }
+
+/* DEATH SCREEN */
+#death-screen .logo { font-size: clamp(28px, 9vw, 52px); color: var(–accent); text-shadow: var(–glow-red); animation: none; }
+
+#final-score {
+font-family: ‘Orbitron’, monospace;
+font-size: clamp(48px, 16vw, 96px);
+font-weight: 900;
+color: #fff;
+text-shadow: 0 0 30px rgba(255,255,255,0.5);
+line-height: 1;
+margin: 10px 0 4px;
+}
+
+#new-best {
+font-size: 13px;
+letter-spacing: 4px;
+color: var(–warn);
+text-shadow: 0 0 15px rgba(255,184,0,0.8);
+margin-bottom: 10px;
+min-height: 20px;
+}
+
+.stats-row {
+display: flex;
+gap: 32px;
+margin-bottom: 40px;
+font-size: 11px;
+color: rgba(0,255,231,0.4);
+letter-spacing: 2px;
+}
+
+.stats-row span b {
+display: block;
+font-family: ‘Orbitron’, monospace;
+font-size: 18px;
+color: var(–primary);
+margin-top: 4px;
+}
+
+#death-screen .tap-btn {
+background: var(–accent);
+box-shadow: var(–glow-red);
+animation: none;
+}
+
+/* COMBO */
+#combo {
+position: absolute;
+right: 16px;
+top: 80px;
+text-align: right;
+pointer-events: none;
+font-family: ‘Orbitron’, monospace;
+font-size: 11px;
+letter-spacing: 2px;
+color: rgba(0,255,231,0.35);
+transition: all 0.2s;
+}
+
+#combo.active {
+color: var(–warn);
+text-shadow: 0 0 12px rgba(255,184,0,0.7);
+font-size: 13px;
+}
+
+#combo-val {
+font-size: 26px;
+font-weight: 900;
+display: block;
+line-height: 1;
+}
+
+/* SPEED INDICATOR */
+#speed-bar-wrap {
+position: absolute;
+left: 14px;
+top: 80px;
+width: 4px;
+height: 100px;
+background: rgba(0,255,231,0.08);
+border-radius: 2px;
+}
+
+#speed-bar {
+position: absolute;
+bottom: 0; left: 0; right: 0;
+background: var(–primary);
+border-radius: 2px;
+box-shadow: var(–glow);
+transition: height 0.3s;
+}
+
+#speed-label {
+position: absolute;
+left: 10px;
+top: -18px;
+font-size: 9px;
+letter-spacing: 2px;
+color: rgba(0,255,231,0.3);
+}
+
+/* PARTICLES */
+.particle {
+position: absolute;
+width: 4px; height: 4px;
+border-radius: 50%;
+pointer-events: none;
+}
+</style>
+
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div id="score-wrap">
+    <div id="score">0</div>
+    <div id="best-label">BEST</div>
+    <div id="best">0</div>
+  </div>
+
+  <div id="combo">
+    COMBO <span id="combo-val">x1</span>
+  </div>
+
+  <div id="speed-bar-wrap">
+    <div id="speed-label">SPD</div>
+    <div id="speed-bar" style="height:10%"></div>
+  </div>
+</div>
+
+<!-- START SCREEN -->
+
+<div class="screen" id="start-screen">
+  <div class="logo">GRAVITY<br><span>SHIFT</span></div>
+  <div class="tagline">infinite reflex arcade</div>
+  <button class="tap-btn" id="start-btn">BAŞLA</button>
+  <div class="hint">
+    <b>BASILI TUT</b> → Yukarı git<br>
+    <b>BIRAK</b> → Aşağı düş<br>
+    Engelleri aş · Combo yap · Skor kır
+  </div>
+</div>
+
+<!-- DEATH SCREEN -->
+
+<div class="screen hidden" id="death-screen">
+  <div class="logo">CRASHED</div>
+  <div id="final-score">0</div>
+  <div id="new-best"></div>
+  <div class="stats-row">
+    <span>COMBO<b id="stat-combo">0</b></span>
+    <span>MESAFE<b id="stat-dist">0m</b></span>
+    <span>EN İYİ<b id="stat-best">0</b></span>
+  </div>
+  <button class="tap-btn" id="restart-btn">TEKRAR</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  GRAVITY SHIFT — Core Engine
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── State ──────────────────────────────────────
+const STATES = { START: 0, PLAYING: 1, DEAD: 2 };
+let state = STATES.START;
+
+let player, obstacles, particles, score, scoreF, combo, maxCombo, dist, speed, bgOffset;
+let pressing = false;
+let bestScore = +localStorage.getItem('gs_best') || 0;
+let animId;
+
+// ── Constants ──────────────────────────────────
+const PLAYER_X = 90;
+const GRAVITY = 0.55;
+const LIFT = -0.72;
+const BASE_SPEED = 3.5;
+const MAX_SPEED = 11;
+const SPEED_INC = 0.0008;
+const OBS_MIN_GAP = 140;
+const OBS_MAX_GAP = 240;
+const OBS_MIN_W = 22;
+const OBS_MAX_W = 48;
+
+// ── Init ───────────────────────────────────────
+function initGame() {
+  player = { x: PLAYER_X, y: H/2, vy: 0, w: 22, h: 22, trail: [] };
+  obstacles = [];
+  particles = [];
+  score = 0; scoreF = 0; combo = 0; maxCombo = 0; dist = 0;
+  speed = BASE_SPEED; bgOffset = 0;
+  pressing = false;
+  spawnObstacle(W + 100);
+  spawnObstacle(W + 380);
+  spawnObstacle(W + 660);
+  updateBestUI();
+}
+
+function spawnObstacle(x) {
+  const gap = OBS_MIN_GAP + Math.random() * (OBS_MAX_GAP - OBS_MIN_GAP);
+  const gapY = 80 + Math.random() * (H - 160 - gap);
+  const w = OBS_MIN_W + Math.random() * (OBS_MAX_W - OBS_MIN_W);
+  const isScorer = Math.random() > 0.4;
+  obstacles.push({
+    x, w,
+    topH: gapY,
+    botY: gapY + gap,
+    botH: H - (gapY + gap),
+    scored: false,
+    glow: isScorer ? Math.random() : 0,
+    color: isScorer ? `hsl(${180 + Math.random()*60},100%,55%)` : `hsl(${340 + Math.random()*30},90%,55%)`
+  });
+}
+
+// ── Physics ────────────────────────────────────
+function update() {
+  if (state !== STATES.PLAYING) return;
+
+  // Speed ramp
+  speed = Math.min(MAX_SPEED, speed + SPEED_INC * speed);
+  dist += speed;
+
+  bgOffset += speed * 0.5;
+
+  // Player physics
+  player.vy += pressing ? LIFT : GRAVITY;
+  player.vy = Math.max(-9, Math.min(9, player.vy));
+  player.y += player.vy;
+
+  // Trail
+  player.trail.unshift({ x: player.x, y: player.y });
+  if (player.trail.length > 14) player.trail.pop();
+
+  // Boundary death
+  if (player.y < 0 || player.y + player.h > H) { die(); return; }
+
+  // Obstacles
+  let passed = false;
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    const o = obstacles[i];
+    o.x -= speed;
+
+    // Score
+    if (!o.scored && o.x + o.w < player.x) {
+      o.scored = true;
+      scoreF += 1;
+      combo++;
+      maxCombo = Math.max(maxCombo, combo);
+      passed = true;
+      spawnPassParticles(o.x + o.w, o.topH + (H - o.topH - o.botH) / 2);
+    }
+
+    // Collision
+    const px = player.x, py = player.y;
+    const pw = player.w * 0.8, ph = player.h * 0.8; // slim hitbox
+    if (
+      px + pw > o.x && px < o.x + o.w &&
+      (py < o.topH || py + ph > o.botY)
+    ) { die(); return; }
+
+    if (o.x + o.w < -80) obstacles.splice(i, 1);
+  }
+
+  // Spawn
+  if (obstacles.length < 5) {
+    const lastX = Math.max(...obstacles.map(o => o.x));
+    const spacing = 200 + Math.max(0, 140 - speed * 8);
+    spawnObstacle(lastX + spacing);
+  }
+
+  // Score (smooth + combo multiplier)
+  const multiplier = 1 + Math.floor(combo / 5) * 0.5;
+  score += speed * 0.02 * multiplier;
+  if (passed) score += 10 * multiplier;
+
+  // Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy;
+    p.life -= 0.03;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // UI
+  updateScoreUI();
+  updateComboUI();
+  updateSpeedUI();
+}
+
+function die() {
+  state = STATES.DEAD;
+  spawnDeathParticles();
+  const finalScore = Math.floor(score);
+  const isNew = finalScore > bestScore;
+  if (isNew) { bestScore = finalScore; localStorage.setItem('gs_best', bestScore); }
+  showDeath(finalScore, isNew);
+}
+
+// ── Particles ──────────────────────────────────
+function spawnPassParticles(x, y) {
+  for (let i = 0; i < 12; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const spd = 1.5 + Math.random() * 3;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd,
+      life: 1,
+      color: `hsl(${160 + Math.random()*60},100%,70%)`,
+      size: 2 + Math.random() * 4
+    });
+  }
+}
+
+function spawnDeathParticles() {
+  for (let i = 0; i < 40; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const spd = 2 + Math.random() * 6;
+    particles.push({
+      x: player.x, y: player.y,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd,
+      life: 1,
+      color: `hsl(${Math.random() > 0.5 ? 350 : 40},100%,65%)`,
+      size: 3 + Math.random() * 6
+    });
+  }
+}
+
+// ── Draw ───────────────────────────────────────
+function draw() {
+  // Background
+  ctx.fillStyle = '#05060f';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(0,255,231,0.04)';
+  ctx.lineWidth = 1;
+  const gridSize = 60;
+  const ox = bgOffset % gridSize;
+  for (let x = -ox; x < W + gridSize; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H + gridSize; y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Scanline overlay
+  const lineGap = 4;
+  for (let y = 0; y < H; y += lineGap) {
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    ctx.fillRect(0, y, W, 1);
+  }
+
+  // Obstacles
+  for (const o of obstacles) {
+    // Top bar
+    const grad1 = ctx.createLinearGradient(o.x, 0, o.x + o.w, 0);
+    grad1.addColorStop(0, 'rgba(255,45,120,0.1)');
+    grad1.addColorStop(1, o.color);
+    ctx.fillStyle = grad1;
+    ctx.shadowColor = o.color;
+    ctx.shadowBlur = 15;
+    roundRect(ctx, o.x, 0, o.w, o.topH, 4);
+    ctx.fill();
+
+    // Bottom bar
+    roundRect(ctx, o.x, o.botY, o.w, o.botH, 4);
+    ctx.fill();
+
+    // Edge glow line
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.shadowBlur = 0;
+    ctx.fillRect(o.x + o.w - 2, 0, 2, o.topH);
+    ctx.fillRect(o.x + o.w - 2, o.botY, 2, o.botH);
+    ctx.fillRect(o.x, 0, 2, o.topH);
+    ctx.fillRect(o.x, o.botY, 2, o.botH);
+  }
+  ctx.shadowBlur = 0;
+
+  // Player trail
+  for (let i = player.trail.length - 1; i >= 0; i--) {
+    const t = player.trail[i];
+    const a = (1 - i / player.trail.length) * 0.35;
+    const s = player.w * (1 - i / player.trail.length) * 0.9;
+    ctx.beginPath();
+    ctx.arc(t.x + player.w/2, t.y + player.h/2, s/2, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(0,255,231,${a})`;
+    ctx.fill();
+  }
+
+  // Player
+  if (state === STATES.PLAYING || state === STATES.DEAD) {
+    const px = player.x, py = player.y, pw = player.w, ph = player.h;
+    ctx.shadowColor = '#00ffe7';
+    ctx.shadowBlur = 25;
+
+    // Body
+    ctx.fillStyle = pressing ? '#fff' : '#00ffe7';
+    ctx.beginPath();
+    // Arrow shape
+    ctx.moveTo(px + pw, py + ph/2);
+    ctx.lineTo(px + pw * 0.2, py);
+    ctx.lineTo(px + pw * 0.4, py + ph/2);
+    ctx.lineTo(px + pw * 0.2, py + ph);
+    ctx.closePath();
+    ctx.fill();
+
+    // Thruster flame
+    if (pressing) {
+      const flameLen = 16 + Math.random() * 12;
+      const flameGrad = ctx.createLinearGradient(px, 0, px - flameLen, 0);
+      flameGrad.addColorStop(0, 'rgba(0,255,231,0.9)');
+      flameGrad.addColorStop(0.5, 'rgba(255,184,0,0.6)');
+      flameGrad.addColorStop(1, 'rgba(255,45,120,0)');
+      ctx.fillStyle = flameGrad;
+      ctx.beginPath();
+      ctx.moveTo(px + pw * 0.4, py + ph/2 - 4);
+      ctx.lineTo(px - flameLen, py + ph/2);
+      ctx.lineTo(px + pw * 0.4, py + ph/2 + 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  // Particles
+  for (const p of particles) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+
+  // Danger zones (top/bottom edge warning)
+  const dangerH = 40;
+  const dAlpha = Math.max(0, Math.min(0.5, (dangerH - player.y) / dangerH));
+  const dAlphaB = Math.max(0, Math.min(0.5, (dangerH - (H - player.y - player.h)) / dangerH));
+  if (dAlpha > 0) {
+    const g = ctx.createLinearGradient(0,0,0,dangerH);
+    g.addColorStop(0, `rgba(255,45,120,${dAlpha})`);
+    g.addColorStop(1, 'rgba(255,45,120,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,dangerH);
+  }
+  if (dAlphaB > 0) {
+    const g = ctx.createLinearGradient(0,H-dangerH,0,H);
+    g.addColorStop(0,'rgba(255,45,120,0)');
+    g.addColorStop(1,`rgba(255,45,120,${dAlphaB})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0,H-dangerH,W,dangerH);
+  }
+
+  // Combo flash
+  if (combo > 0 && combo % 5 === 0 && state === STATES.PLAYING) {
+    ctx.fillStyle = `rgba(255,184,0,0.07)`;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(x, y, w, h, r) :
+    (ctx.rect(x, y, w, h), ctx.closePath());
+}
+
+// ── Loop ───────────────────────────────────────
+function loop() {
+  update();
+  draw();
+  animId = requestAnimationFrame(loop);
+}
+
+// ── UI helpers ─────────────────────────────────
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const comboEl = document.getElementById('combo');
+const comboValEl = document.getElementById('combo-val');
+const speedBarEl = document.getElementById('speed-bar');
+
+let lastDisplayScore = 0;
+function updateScoreUI() {
+  const s = Math.floor(score);
+  if (s !== lastDisplayScore) {
+    scoreEl.textContent = s;
+    lastDisplayScore = s;
+    scoreEl.classList.add('pop');
+    setTimeout(() => scoreEl.classList.remove('pop'), 80);
+  }
+}
+
+function updateBestUI() {
+  bestEl.textContent = bestScore;
+}
+
+function updateComboUI() {
+  if (combo >= 3) {
+    comboEl.classList.add('active');
+    comboValEl.textContent = `x${1 + Math.floor(combo/5) * 0.5}`;
+  } else {
+    comboEl.classList.remove('active');
+    comboValEl.textContent = 'x1';
+  }
+}
+
+function updateSpeedUI() {
+  const pct = ((speed - BASE_SPEED) / (MAX_SPEED - BASE_SPEED)) * 100;
+  speedBarEl.style.height = Math.max(5, pct) + '%';
+}
+
+function showDeath(finalScore, isNew) {
+  document.getElementById('final-score').textContent = finalScore;
+  document.getElementById('new-best').textContent = isNew ? '★ YENİ REKOR ★' : '';
+  document.getElementById('stat-combo').textContent = maxCombo;
+  document.getElementById('stat-dist').textContent = Math.floor(dist / 60) + 'm';
+  document.getElementById('stat-best').textContent = bestScore;
+  document.getElementById('death-screen').classList.remove('hidden');
+}
+
+// ── Input ──────────────────────────────────────
+function pressStart() {
+  if (state === STATES.PLAYING) pressing = true;
+}
+function pressEnd() {
+  pressing = false;
+}
+
+document.addEventListener('touchstart', e => { e.preventDefault(); pressStart(); }, { passive: false });
+document.addEventListener('touchend', e => { e.preventDefault(); pressEnd(); }, { passive: false });
+document.addEventListener('mousedown', pressStart);
+document.addEventListener('mouseup', pressEnd);
+document.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); pressStart(); }});
+document.addEventListener('keyup', e => { if (e.code === 'Space') pressEnd(); });
+
+// ── Buttons ────────────────────────────────────
+function startGame() {
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('death-screen').classList.add('hidden');
+  initGame();
+  state = STATES.PLAYING;
+}
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+
+// ── Boot ───────────────────────────────────────
+initGame();
+state = STATES.START;
+
+// Draw static start frame
+draw();
+loop();
+</script>
+
+</body>
+</html>
